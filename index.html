@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Timeframe Asset Screener</title>
+    <link rel="manifest" href="data:application/json,{%22name%22:%22Asset%22,%22short_name%22:%22Screener%22,%22start_url%22:%22.%22,%22display%22:%22standalone%22,%22background_color%22:%22#0f172a%22,%22theme_color%22:%22#0f172a%22}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: { 850: '#111827', 900: '#0f172a' }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased pb-12">
+
+    <header class="border-b border-slate-800 bg-slate-900/80 sticky top-0 z-50 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white text-lg">📈</div>
+                <h1 class="text-xl font-bold tracking-tight text-white">Multi-Timeframe Asset Evaluator</h1>
+            </div>
+            <div class="text-xs text-slate-400">
+                Stored Queries: <span id="storage-count" class="font-semibold text-indigo-400">0</span> / 100
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <section class="lg:col-span-5 bg-slate-800/60 border border-slate-700/60 rounded-xl p-6 shadow-xl backdrop-blur-sm">
+            <h2 class="text-lg font-semibold text-white mb-4 border-b border-slate-700 pb-2">Asset Parameters</h2>
+            <form id="screener-form" class="space-y-4">
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Ticker / Symbol</label>
+                        <input type="text" id="symbol" required placeholder="e.g. NVDA, VOO" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm uppercase focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Asset Class</label>
+                        <select id="assetType" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <option value="stock">Individual Stock</option>
+                            <option value="etf">ETF</option>
+                            <option value="mutual_fund">Mutual Fund</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-700/50">
+                    <h3 class="text-xs font-semibold uppercase text-indigo-400 mb-2">Technical Factors</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">RSI (14-Day)</label>
+                            <input type="number" id="rsi" min="0" max="100" placeholder="e.g. 58" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Go/NoGo Trend</label>
+                            <select id="gonogo" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
+                                <option value="bullish">Strong Go (Bullish)</option>
+                                <option value="neutral">Neutral / Transition</option>
+                                <option value="bearish">No Go (Bearish)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 mt-2">
+                        <div>
+                            <label class="block text-[11px] text-slate-400">Price vs 20MA</label>
+                            <select id="ma20" class="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-xs">
+                                <option value="above">Above</option>
+                                <option value="below">Below</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400">Price vs 50MA</label>
+                            <select id="ma50" class="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-xs">
+                                <option value="above">Above</option>
+                                <option value="below">Below</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400">50MA vs 200MA</label>
+                            <select id="maCross" class="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-xs">
+                                <option value="golden">Golden Cross</option>
+                                <option value="neutral">Neutral</option>
+                                <option value="death">Death Cross</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-700/50">
+                    <h3 class="text-xs font-semibold uppercase text-indigo-400 mb-2">Fundamentals & Ratings</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">PEG Ratio</label>
+                            <input type="number" step="0.1" id="peg" placeholder="e.g. 1.2" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">TipRanks Smart Score</label>
+                            <input type="number" id="tipranks" min="1" max="10" placeholder="1 - 10" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 mt-2">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Morningstar Moat / Rating</label>
+                            <select id="mstar" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
+                                <option value="5">Wide Moat / 5 Star</option>
+                                <option value="4">Narrow Moat / 4 Star</option>
+                                <option value="3">3 Star / Moderate</option>
+                                <option value="2">2 Star / Weak</option>
+                                <option value="1">1 Star / Poor</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Fund Structural Overlap</label>
+                            <select id="overlap" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
+                                <option value="low">Low Overlap (&lt;15%)</option>
+                                <option value="med">Medium Overlap (15-35%)</option>
+                                <option value="high">High Overlap (&gt;35%)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-700/50">
+                    <h3 class="text-xs font-semibold uppercase text-indigo-400 mb-2">Macro & Market Environment</h3>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="block text-[11px] text-slate-400">Inflation Trend</label>
+                            <select id="macroInflation" class="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-xs">
+                                <option value="easing">Easing / Falling</option>
+                                <option value="sticky">Sticky / Moderate</option>
+                                <option value="rising">Rising / Hawkish</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400">Geopolitical Risk</label>
+                            <select id="macroGeo" class="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-xs">
+                                <option value="low">Low / Stable</option>
+                                <option value="moderate">Moderate</option>
+                                <option value="high">Elevated / High</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400">Election Cycle</label>
+                            <select id="macroElection" class="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-xs">
+                                <option value="midterm">Midterm Year</option>
+                                <option value="presidential">Election Year</option>
+                                <option value="post_election">Post-Election</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-lg transition-colors shadow-lg shadow-indigo-600/30 text-sm mt-4">
+                    Run Multi-Timeframe Analysis
+                </button>
+            </form>
+        </section>
+
+        <section class="lg:col-span-7 space-y-6">
+            
+            <div id="results-panel" class="hidden bg-slate-800/80 border border-slate-700 rounded-xl p-6 shadow-xl">
+                <div class="flex justify-between items-center border-b border-slate-700 pb-4 mb-4">
+                    <div>
+                        <span id="res-asset-type" class="text-xs font-bold uppercase tracking-wider text-indigo-400">STOCK</span>
+                        <h2 id="res-symbol" class="text-3xl font-extrabold text-white">---</h2>
+                    </div>
+                    <div id="res-overall-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-700 text-slate-300">
+                        Evaluated Just Now
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                    <div class="bg-slate-900/90 border border-slate-700/60 p-3 rounded-lg text-center">
+                        <span class="text-[10px] text-slate-400 uppercase font-semibold">1 Month</span>
+                        <div id="rec-1m" class="text-lg font-black my-1">--</div>
+                        <div id="score-1m" class="text-[11px] text-slate-400">Score: -</div>
+                    </div>
+                    <div class="bg-slate-900/90 border border-slate-700/60 p-3 rounded-lg text-center">
+                        <span class="text-[10px] text-slate-400 uppercase font-semibold">3 Months</span>
+                        <div id="rec-3m" class="text-lg font-black my-1">--</div>
+                        <div id="score-3m" class="text-[11px] text-slate-400">Score: -</div>
+                    </div>
+                    <div class="bg-slate-900/90 border border-slate-700/60 p-3 rounded-lg text-center">
+                        <span class="text-[10px] text-slate-400 uppercase font-semibold">12 Months</span>
+                        <div id="rec-12m" class="text-lg font-black my-1">--</div>
+                        <div id="score-12m" class="text-[11px] text-slate-400">Score: -</div>
+                    </div>
+                    <div class="bg-slate-900/90 border border-slate-700/60 p-3 rounded-lg text-center">
+                        <span class="text-[10px] text-slate-400 uppercase font-semibold">48 Months</span>
+                        <div id="rec-48m" class="text-lg font-black my-1">--</div>
+                        <div id="score-48m" class="text-[11px] text-slate-400">Score: -</div>
+                    </div>
+                </div>
+
+                <div class="space-y-2 text-xs text-slate-300 bg-slate-900/50 p-4 rounded-lg border border-slate-700/40">
+                    <h4 class="font-bold text-white mb-2 text-sm">Key Evaluation Factors:</h4>
+                    <ul id="res-rationale" class="list-disc list-inside space-y-1">
+                        </ul>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-6 shadow-xl">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-md font-bold text-white">Evaluation History (Last 100)</h3>
+                    <button id="clear-history" class="text-xs text-red-400 hover:text-red-300">Clear All</button>
+                </div>
+                <div class="overflow-x-auto max-h-80 overflow-y-auto">
+                    <table class="w-full text-left text-xs text-slate-300">
+                        <thead class="bg-slate-900/80 text-slate-400 uppercase text-[10px] sticky top-0">
+                            <tr>
+                                <th class="p-2">Ticker</th>
+                                <th class="p-2">Type</th>
+                                <th class="p-2">1M</th>
+                                <th class="p-2">3M</th>
+                                <th class="p-2">12M</th>
+                                <th class="p-2">48M</th>
+                                <th class="p-2">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body" class="divide-y divide-slate-700/50">
+                            <tr>
+                                <td colspan="7" class="p-4 text-center text-slate-500">No evaluations saved yet.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const MAX_HISTORY = 100;
+
+        document.getElementById('screener-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            runEvaluation();
+        });
+
+        document.getElementById('clear-history').addEventListener('click', function() {
+            localStorage.removeItem('screener_history');
+            renderHistory();
+        });
+
+        function runEvaluation() {
+            const symbol = document.getElementById('symbol').value.toUpperCase().trim();
+            const assetType = document.getElementById('assetType').value;
+            const rsi = parseFloat(document.getElementById('rsi').value) || 50;
+            const gonogo = document.getElementById('gonogo').value;
+            const ma20 = document.getElementById('ma20').value;
+            const ma50 = document.getElementById('ma50').value;
+            const maCross = document.getElementById('maCross').value;
+            const peg = parseFloat(document.getElementById('peg').value) || 1.5;
+            const tipranks = parseInt(document.getElementById('tipranks').value) || 5;
+            const mstar = parseInt(document.getElementById('mstar').value) || 3;
+            const overlap = document.getElementById('overlap').value;
+            const inflation = document.getElementById('macroInflation').value;
+            const geo = document.getElementById('macroGeo').value;
+            const election = document.getElementById('macroElection').value;
+
+            // Score Calculations for Horizons (Base range -100 to +100)
+            let score1M = 0, score3M = 0, score12M = 0, score48M = 0;
+            let drivers = [];
+
+            // 1. Technical Factor Weighting (Dominates 1M & 3M)
+            if (gonogo === 'bullish') { score1M += 35; score3M += 25; drivers.push("Go/NoGo trend is strongly bullish."); }
+            else if (gonogo === 'bearish') { score1M -= 35; score3M -= 25; drivers.push("Go/NoGo trend shows bearish momentum."); }
+
+            if (rsi > 70) { score1M -= 25; drivers.push("RSI (>70) indicates short-term overbought conditions."); }
+            else if (rsi < 30) { score1M += 25; score3M += 10; drivers.push("RSI (<30) indicates oversold bounce potential."); }
+            else { score1M += 10; score3M += 10; }
+
+            if (ma20 === 'above') score1M += 20; else score1M -= 20;
+            if (ma50 === 'above') { score3M += 20; score12M += 10; } else { score3M -= 20; }
+            if (maCross === 'golden') { score3M += 15; score12M += 25; score48M += 10; drivers.push("50/200 MA Golden Cross active."); }
+            if (maCross === 'death') { score3M -= 15; score12M -= 25; score48M -= 10; drivers.push("50/200 MA Death Cross active."); }
+
+            // 2. Fundamental & Valuation Factor Weighting (Dominates 12M & 48M)
+            if (assetType === 'stock') {
+                if (peg < 1.0) { score12M += 30; score48M += 25; drivers.push(`Attractive growth valuation (PEG: ${peg}).`); }
+                else if (peg > 2.0) { score12M -= 20; score48M -= 15; drivers.push(`High growth premium (PEG: ${peg}).`); }
+
+                if (tipranks >= 8) { score3M += 15; score12M += 20; drivers.push(`High TipRanks Smart Score (${tipranks}/10).`); }
+                else if (tipranks <= 3) { score3M -= 15; score12M -= 20; }
+            } else {
+                // Funds/ETFs adjust for structural overlap
+                if (overlap === 'high') { score12M -= 15; score48M -= 25; drivers.push("High holdings overlap reduces diversification."); }
+                else if (overlap === 'low') { score12M += 10; score48M += 15; }
+            }
+
+            // Morningstar Moat / Quality Rating
+            if (mstar >= 4) { score12M += 15; score48M += 35; drivers.push("Strong competitive moat / high Morningstar rating."); }
+            else if (mstar <= 2) { score12M -= 15; score48M -= 25; }
+
+            // 3. Macroeconomic & Geopolitical Adjustments
+            if (inflation === 'rising') { score1M -= 10; score3M -= 15; score12M -= 15; drivers.push("Rising inflation pressures valuations."); }
+            if (geo === 'high') { score1M -= 15; score3M -= 15; score12M -= 10; drivers.push("Elevated geopolitical risks weigh on short-term stability."); }
+            if (election === 'presidential' || election === 'midterm') { score3M -= 5; score12M += 10; drivers.push("Election cycle volatility factored into 3M/12M outlook."); }
+
+            // Normalize and Map Recommendations
+            const rec1M = getRating(score1M);
+            const rec3M = getRating(score3M);
+            const rec12M = getRating(score12M);
+            const rec48M = getRating(score48M);
+
+            const resultObj = {
+                id: Date.now(),
+                date: new Date().toLocaleDateString(),
+                symbol, assetType, score1M, score3M, score12M, score48M,
+                rec1M, rec3M, rec12M, rec48M, drivers
+            };
+
+            displayResults(resultObj);
+            saveToHistory(resultObj);
+        }
+
+        function getRating(score) {
+            if (score >= 35) return { text: "BUY", color: "text-emerald-400" };
+            if (score <= -20) return { text: "SELL", color: "text-rose-500" };
+            return { text: "HOLD", color: "text-amber-400" };
+        }
+
+        function displayResults(data) {
+            document.getElementById('results-panel').classList.remove('hidden');
+            document.getElementById('res-symbol').innerText = data.symbol;
+            document.getElementById('res-asset-type').innerText = data.assetType.replace('_', ' ');
+
+            const renderCard = (idPrefix, rec, score) => {
+                const textEl = document.getElementById(`rec-${idPrefix}`);
+                const scoreEl = document.getElementById(`score-${idPrefix}`);
+                textEl.innerText = rec.text;
+                textEl.className = `text-lg font-black my-1 ${rec.color}`;
+                scoreEl.innerText = `Score: ${score}`;
+            };
+
+            renderCard('1m', data.rec1M, data.score1M);
+            renderCard('3m', data.rec3m || data.rec3M, data.score3M);
+            renderCard('12m', data.rec12m || data.rec12M, data.score12M);
+            renderCard('48m', data.rec48m || data.rec48M, data.score48M);
+
+            const listEl = document.getElementById('res-rationale');
+            listEl.innerHTML = data.drivers.map(d => `<li>${d}</li>`).join('');
+        }
+
+        function saveToHistory(item) {
+            let history = JSON.parse(localStorage.getItem('screener_history') || '[]');
+            history.unshift(item); // Add to front
+            if (history.length > MAX_HISTORY) history = history.slice(0, MAX_HISTORY);
+            localStorage.setItem('screener_history', JSON.stringify(history));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const history = JSON.parse(localStorage.getItem('screener_history') || '[]');
+            document.getElementById('storage-count').innerText = history.length;
+            const tbody = document.getElementById('history-table-body');
+
+            if (history.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500">No evaluations saved yet.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = history.map(item => `
+                <tr class="hover:bg-slate-800/80 transition-colors border-b border-slate-700/30">
+                    <td class="p-2 font-bold text-white">${item.symbol}</td>
+                    <td class="p-2 uppercase text-[10px] text-slate-400">${item.assetType.replace('_', ' ')}</td>
+                    <td class="p-2 ${item.rec1M.color} font-semibold">${item.rec1M.text}</td>
+                    <td class="p-2 ${item.rec3M.color} font-semibold">${item.rec3M.text}</td>
+                    <td class="p-2 ${item.rec12M.color} font-semibold">${item.rec12M.text}</td>
+                    <td class="p-2 ${item.rec48M.color} font-semibold">${item.rec48M.text}</td>
+                    <td class="p-2">
+                        <button onclick='loadFromHistory(${item.id})' class="text-indigo-400 hover:text-indigo-300 text-[11px] underline">View</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function loadFromHistory(id) {
+            const history = JSON.parse(localStorage.getItem('screener_history') || '[]');
+            const item = history.find(h => h.id === id);
+            if (item) displayResults(item);
+        }
+
+        // Initial Load
+        renderHistory();
+    </script>
+</body>
+</html>
